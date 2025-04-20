@@ -1,0 +1,99 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String              @id @default(cuid())
+  name              String
+  email             String              @unique
+  password          String
+  role              Role                @default(USER)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  createdMeetings   Meeting[]           @relation("CreatedBy")
+  participantIn     Meeting[]           @relation("Participants")
+  accessTokens      MeetingAccessToken[]
+  sentMessages      SignalingMessage[]  @relation("SentBy")
+  receivedMessages  SignalingMessage[]  @relation("ReceivedBy")
+  verificationCodes VerificationCode[]
+  loginAttempts     LoginAttempt[]
+}
+
+model VerificationCode {
+  id        String   @id @default(cuid())
+  code      String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      VerificationCodeType
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+enum VerificationCodeType {
+  STEP_ONE
+  STEP_TWO
+  STEP_THREE
+}
+
+model Meeting {
+  id                String              @id
+  title             String
+  description       String?
+  scheduledFor      DateTime
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  createdBy         String
+  creator           User                @relation("CreatedBy", fields: [createdBy], references: [id])
+  participants      User[]              @relation("Participants")
+  accessTokens      MeetingAccessToken[]
+  signalingMessages SignalingMessage[]
+}
+
+model MeetingAccessToken {
+  id          String    @id @default(cuid())
+  token       String    @unique
+  meetingId   String
+  meeting     Meeting   @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime
+}
+
+model SignalingMessage {
+  id          String    @id @default(cuid())
+  meetingId   String
+  meeting     Meeting   @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  fromUserId  String
+  fromUser    User      @relation("SentBy", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUserId    String
+  toUser      User      @relation("ReceivedBy", fields: [toUserId], references: [id], onDelete: Cascade)
+  signal      String    // JSON stringified WebRTC signal
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime
+}
+
+model LoginAttempt {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress       String?
+  userAgent       String?
+  success         Boolean
+  failureReason   String?
+  createdAt       DateTime  @default(now())
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
